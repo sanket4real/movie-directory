@@ -8,6 +8,8 @@ const MovieApp = () => {
 	const [sortBy, setSortBy] = useState("popularity.desc");
 	const [genre, setGenre] = useState([]);
 	const [selectedGenre, setSelectedGenre] = useState("");
+	const [page, setPage] = useState(1);
+	const [totalPages, setTotalPages] = useState(1);
 
 	useEffect(() => {
 		const fetchGenre = async () => {
@@ -23,32 +25,8 @@ const MovieApp = () => {
 		};
 		fetchGenre();
 	}, []);
-	useEffect(() => {
-		const fetchMovies = async () => {
-			const response = await axios.get(
-				`https://api.themoviedb.org/3/discover/movie`,
-				{
-					params: {
-						api_key: import.meta.env.VITE_MOVIE_KEY,
-						sortBy: sortBy,
-						page: 1,
-						with_genres: selectedGenre,
-						query: searchQuery,
-					},
-				}
-			);
-			setMovies(response.data.results);
-		};
-		fetchMovies();
-	}, [searchQuery, sortBy, selectedGenre]);
 
-	const handleSearchChange = (e) => {
-		e.preventDefault();
-		setSearchQuery(e.target.value);
-	};
-
-	const handleSearchSubmit = async (e) => {
-		e.preventDefault();
+	const fetchMovies = async () => {
 		const response = await axios.get(
 			`https://api.themoviedb.org/3/search/movie`,
 			{
@@ -59,8 +37,60 @@ const MovieApp = () => {
 			}
 		);
 
-		setMovies(response.data.results);
-		console.log(movies);
+		setMovies((prevMovies) => [...prevMovies, ...response.data.results]);
+		setTotalPages(response.data.total_pages);
+	};
+
+	useEffect(() => {
+		const fetchMoviesOnLoad = async () => {
+			const response = await axios.get(
+				"https://api.themoviedb.org/3/discover/movie",
+				{
+					params: {
+						api_key: import.meta.env.VITE_MOVIE_KEY,
+						sort_by: sortBy,
+						page: 1,
+						with_genres: selectedGenre,
+						query: searchQuery,
+					},
+				}
+			);
+			setMovies(response.data.results);
+		};
+		fetchMoviesOnLoad();
+	}, [searchQuery, sortBy, selectedGenre]);
+
+	const handleScroll = () => {
+		if (
+			window.innerHeight + document.documentElement.scrollTop !==
+			document.documentElement.offsetHeight
+		)
+			return;
+		if (page < totalPages) {
+			setPage((prevPage) => prevPage + 1);
+		}
+	};
+
+	useEffect(() => {
+		if (page > 1) {
+			fetchMovies();
+		}
+	}, [page]);
+
+	useEffect(() => {
+		window.addEventListener("scroll", handleScroll);
+		return () => window.removeEventListener("scroll", handleScroll);
+	}, [page, totalPages]);
+
+	const handleSearchChange = (e) => {
+		setSearchQuery(e.target.value);
+	};
+
+	const handleSearchSubmit = async (e) => {
+		e.preventDefault();
+		setPage(1);
+		setMovies([]);
+		await fetchMovies();
 	};
 
 	const handleSortBy = (e) => {
@@ -158,7 +188,7 @@ const MovieApp = () => {
 					</select>
 				</div>
 			</div>
-			<div className="flex flex-wrap gap-10 mt-5">
+			<div className="flex flex-wrap gap-10 mt-5 max-w-[1440px] justify-center mx-auto">
 				{movies.map((movie) => (
 					<Card
 						key={movie.id}
